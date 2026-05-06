@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>OFFSIDE — UCL Statistical Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ── RESET & BASE ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:       #181818;
+  --bg2:      #222222;
+  --bg3:      #2a2a2a;
+  --bg4:      #313131;
+  --border:   #383838;
+  --green:    #3a9a5c;
+  --green2:   #4db870;
+  --green-accent: #2d7a48;
+  --blue:     #4FC3F7;
+  --gray:     #757575;
+  --red:      #F44336;
+  --gold:     #FFD700;
+  --txt:      #F5F5F5;
+  --txt2:     #AAAAAA;
+  --txt3:     #666666;
+  --nav-h:    56px;
+  --header-h: 52px;
+  --radius:   10px;
+  --font:     'DM Sans', sans-serif;
+  --mono:     'DM Mono', monospace;
+  /* Matte grainy green texture via CSS */
+  --green-matte: #3a9a5c;
+}
+
+/* Grain texture overlay for green elements */
+@keyframes grain {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-2%, -3%); }
+  20% { transform: translate(3%, 2%); }
+  30% { transform: translate(-1%, 4%); }
+  40% { transform: translate(2%, -2%); }
+  50% { transform: translate(-3%, 1%); }
+  60% { transform: translate(1%, 3%); }
+  70% { transform: translate(-2%, -1%); }
+  80% { transform: translate(3%, -3%); }
+  90% { transform: translate(-1%, 2%); }
+}
+
+/* Matte green button base */
+.btn-matte {
+  background: var(--green);
+  box-shadow: none !important;
+  filter: none !important;
+  position: relative;
+  overflow: hidden;
+}
+.btn-matte::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-size: 150px;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  opacity: 0.5;
+}
+html, body { height: 100%; background: var(--bg); color: var(--txt); font-family: var(--font); font-size: 14px; overflow: hidden; }
+
+/* ── LAYOUT ───────────────────────────────────────────────────────────────── */
+#app { display: flex; flex-direction: column; height: 100vh; }
+#header { flex-shrink: 0; height: var(--header-h); background: #111; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 16px; z-index: 100; }
+#pages { flex: 1; overflow: hidden; position: relative; }
+.page { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; padding: 20px; display: none; flex-direction: column; gap: 16px; }
+.page.active { display: flex; }
+#nav { flex-shrink: 0; height: var(--nav-h); background: #0e0e0e; border-top: 1px solid var(--border); display: flex; }
+
+/* ── SCROLLBAR ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── HEADER ───────────────────────────────────────────────────────────────── */
+.logo { display: flex; align-items: center; gap: 2px; }
+.logo canvas { width: 34px; height: 34px; }
+.logo-text { font-size: 18px; font-weight: 700; color: var(--txt); letter-spacing: -0.5px; }
+#header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.badge { font-size: 11px; font-weight: 600; color: var(--green2); background: rgba(58,154,92,0.12); border: 1px solid rgba(58,154,92,0.4); border-radius: 4px; padding: 4px 10px; letter-spacing: 0.8px; }
+#upload-section { display: flex; align-items: center; gap: 10px; }
+#upload-btn { background: var(--green); color: #fff; border: none; border-radius: 7px; padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: background .15s; font-family: var(--font); letter-spacing: 0.3px; }
+#upload-btn:hover { background: var(--green2); }
+#file-input { display: none; }
+#upload-status { font-size: 12px; color: var(--txt2); }
+#upload-status.ok { color: var(--green); }
+#upload-status.err { color: var(--red); }
+
+/* ── NAV BUTTONS ──────────────────────────────────────────────────────────── */
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: none; background: transparent; color: var(--txt3); cursor: pointer; font-family: var(--font); font-size: 10px; font-weight: 500; letter-spacing: 0.5px; border-top: 2px solid transparent; transition: all .15s; padding: 0; }
+.nav-btn span.nav-icon { font-size: 18px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.nav-btn:hover { background: rgba(255,255,255,0.04); color: var(--txt2); }
+.nav-btn.active { color: var(--green2); background: rgba(58,154,92,0.1); border-top-color: var(--green); font-weight: 600; }
+
+/* ── UPLOAD OVERLAY ───────────────────────────────────────────────────────── */
+#upload-overlay { position: absolute; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 50; }
+#upload-overlay.hidden { display: none; }
+.upload-drop { width: 380px; border: 2px dashed var(--border); border-radius: 16px; padding: 48px 32px; text-align: center; cursor: pointer; transition: border-color .2s; }
+.upload-drop:hover, .upload-drop.drag { border-color: var(--green); }
+.upload-drop .icon { font-size: 48px; margin-bottom: 12px; }
+.upload-drop h2 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+.upload-drop p { font-size: 13px; color: var(--txt2); margin-bottom: 20px; }
+.upload-drop .btn-upload { background: var(--green); color: #fff; border: none; border-radius: 8px; padding: 11px 28px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: var(--font); }
+
+/* ── CARDS ────────────────────────────────────────────────────────────────── */
+.card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+.card-green { border-color: var(--green); }
+
+/* ── SECTION TITLE ────────────────────────────────────────────────────────── */
+.sec-title { font-size: 11px; font-weight: 600; color: var(--txt3); letter-spacing: 1.5px; text-transform: uppercase; padding: 8px 0 4px; }
+
+/* ── KPI GRID ─────────────────────────────────────────────────────────────── */
+.kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.kpi-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.kpi-icon { font-size: 18px; margin-bottom: 4px; }
+.kpi-label { font-size: 10px; font-weight: 600; color: var(--txt3); letter-spacing: 1px; text-transform: uppercase; }
+.kpi-value { font-size: 22px; font-weight: 700; color: var(--txt); line-height: 1; }
+.kpi-sub { font-size: 11px; color: var(--green); font-weight: 500; }
+
+/* ── FEATURED CARD ────────────────────────────────────────────────────────── */
+#featured-card { background: var(--bg2); border: 1px solid var(--green); border-radius: var(--radius); padding: 16px 20px; }
+.feat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.feat-tag { font-size: 10px; font-weight: 600; color: var(--green); border: 1px solid var(--green); border-radius: 4px; padding: 2px 8px; letter-spacing: 1px; }
+.feat-conf { font-size: 11px; font-weight: 600; color: var(--green); }
+.feat-body { display: flex; align-items: center; gap: 0; }
+.feat-team { flex: 2; }
+.feat-team.home { text-align: right; padding-right: 24px; }
+.feat-team.away { text-align: left; padding-left: 24px; }
+.feat-team-name { font-size: 16px; font-weight: 700; }
+.feat-center { flex: 2; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.feat-pcts { display: flex; gap: 6px; }
+.feat-pct { font-size: 10px; font-weight: 600; border-radius: 4px; padding: 3px 8px; background: rgba(255,255,255,0.06); }
+.feat-pct.home-c { color: var(--green); }
+.feat-pct.draw-c { color: var(--gray); }
+.feat-pct.away-c { color: var(--blue); }
+
+/* ── PERF BANNER ─────────────────────────────────────────────────────────── */
+#perf-banner { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 20px; display: flex; align-items: center; gap: 20px; }
+.perf-num { font-size: 28px; font-weight: 700; color: var(--green); font-family: var(--mono); }
+.perf-desc { display: flex; flex-direction: column; gap: 2px; }
+.perf-desc strong { font-size: 13px; }
+.perf-desc span { font-size: 12px; color: var(--txt2); }
+.perf-stats { margin-left: auto; display: flex; gap: 24px; }
+.perf-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.perf-stat-val { font-size: 16px; font-weight: 700; color: var(--green); }
+.perf-stat-lbl { font-size: 10px; color: var(--txt3); letter-spacing: 0.5px; text-transform: uppercase; }
+
+/* ── TABLES ───────────────────────────────────────────────────────────────── */
+.tbl-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th { background: var(--bg3); color: var(--txt2); font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+tbody tr { border-bottom: 1px solid var(--bg3); transition: background .1s; }
+tbody tr:hover { background: var(--bg3); }
+tbody tr:last-child { border-bottom: none; }
+tbody td { padding: 9px 12px; color: var(--txt); white-space: nowrap; }
+tbody td:first-child { font-weight: 500; }
+.td-green { color: var(--green) !important; font-weight: 600 !important; }
+.td-blue { color: var(--blue) !important; font-weight: 600 !important; }
+.td-gold { color: var(--gold) !important; }
+.td-red { color: var(--red) !important; }
+.td-muted { color: var(--txt3) !important; }
+
+/* ── CHARTS ───────────────────────────────────────────────────────────────── */
+.chart-img { width: 100%; border-radius: 8px; display: block; background: var(--bg2); min-height: 60px; }
+.chart-loading { display: flex; align-items: center; justify-content: center; height: 220px; color: var(--txt3); font-size: 13px; gap: 8px; }
+.spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── CONTROLS ─────────────────────────────────────────────────────────────── */
+.ctrl-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ctrl-label { font-size: 12px; color: var(--txt2); font-weight: 500; }
+select, input[type="text"], input[type="number"] {
+  background: var(--bg3); color: var(--txt); border: 1px solid var(--border);
+  border-radius: 7px; padding: 8px 12px; font-size: 13px; font-family: var(--font);
+  outline: none; transition: border-color .15s;
+}
+select:focus, input:focus { border-color: var(--green); }
+select option { background: var(--bg3); }
+.btn { background: var(--green); color: #fff; border: none; border-radius: 7px; padding: 9px 20px; font-size: 13px; font-weight: 700; cursor: pointer; transition: background .15s; font-family: var(--font); letter-spacing: 0.3px; }
+.btn:hover { background: var(--green2); }
+.btn-outline { background: transparent; color: var(--green); border: 1px solid var(--green); }
+.btn-outline:hover { background: rgba(58,154,92,0.12); }
+.result-text { font-size: 13px; font-weight: 600; color: var(--green); }
+
+/* ── INFO BOX ─────────────────────────────────────────────────────────────── */
+.info-box { background: var(--bg2); border-left: 3px solid var(--green); border-radius: 6px; padding: 12px 16px; font-size: 13px; color: var(--txt); line-height: 1.6; }
+.info-box.blue { border-left-color: var(--blue); }
+
+/* ── PREDICTOR ────────────────────────────────────────────────────────────── */
+#pred-selector { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.pred-team-col { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 160px; }
+.pred-team-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+.pred-vs { font-size: 18px; font-weight: 700; color: var(--txt3); align-self: center; padding: 0 4px; padding-top: 20px; }
+
+#pred-result { background: var(--bg2); border: 1px solid var(--green); border-radius: var(--radius); padding: 20px; display: none; }
+#pred-result.visible { display: block; }
+.pred-result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.pred-winner { font-size: 15px; font-weight: 700; }
+.pred-winner.home-w { color: var(--green); }
+.pred-winner.away-w { color: var(--blue); }
+.pred-winner.draw-w { color: var(--gold); }
+.pred-main { display: flex; align-items: center; gap: 0; }
+.pred-side { flex: 2; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pred-side-name { font-size: 15px; font-weight: 700; }
+.pred-side-pct { font-size: 30px; font-weight: 700; line-height: 1; }
+.pred-side-pct.home-c { color: var(--green); }
+.pred-side-pct.away-c { color: var(--blue); }
+.pred-side-lbl { font-size: 10px; color: var(--txt3); letter-spacing: 1px; text-transform: uppercase; }
+.pred-donut-col { flex: 2; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.pred-draw { font-size: 13px; color: var(--gray); }
+
+.comp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+
+/* ── ANALYTICS TABS ───────────────────────────────────────────────────────── */
+.sub-tabs { display: flex; gap: 2px; background: var(--bg3); border-radius: 8px; padding: 3px; width: fit-content; }
+.sub-tab { padding: 7px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; background: transparent; color: var(--txt3); font-family: var(--font); transition: all .15s; }
+.sub-tab.active { background: var(--bg2); color: var(--green); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+.sub-panel { display: none; flex-direction: column; gap: 14px; }
+.sub-panel.active { display: flex; }
+
+/* ── PLAYERS ──────────────────────────────────────────────────────────────── */
+.players-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+#players-count { font-size: 12px; color: var(--green); font-weight: 600; margin-left: auto; }
+.pagination { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--txt2); }
+.page-btn { background: var(--bg3); border: 1px solid var(--border); color: var(--txt2); border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 13px; font-family: var(--font); transition: all .15s; }
+.page-btn:hover:not(:disabled) { border-color: var(--green); color: var(--green); }
+.page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── INTERACTIVE CHART ────────────────────────────────────────────────────── */
+.chart-canvas-wrap { position: relative; width: 100%; }
+.chart-canvas-wrap canvas { display: block; width: 100% !important; }
+
+/* ── DETAILED STATS SECTION ───────────────────────────────────────────────── */
+.detail-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.detail-stat-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; }
+.detail-stat-label { font-size: 10px; font-weight: 600; color: var(--txt3); letter-spacing: 1px; text-transform: uppercase; }
+.detail-stat-value { font-size: 18px; font-weight: 700; color: var(--txt); }
+.detail-stat-sub { font-size: 11px; color: var(--green); }
+.detail-stat-bar { height: 3px; background: var(--bg4); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+.detail-stat-bar-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width 0.6s ease; }
+
+/* ── RESPONSIVE two-col ───────────────────────────────────────────────────── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <div id="header">
+    <div class="logo">
+      <canvas id="logo-canvas" width="34" height="34"></canvas>
+      <span class="logo-text">FFSIDE</span>
+    </div>
+    <div id="header-right">
+      <span class="badge">UCL · Round of 16</span>
+      <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none"/>
+      <span id="upload-status" style="font-size:12px;color:var(--txt3);">Loading…</span>
+    </div>
+  </div>
+
+  <!-- PAGES -->
+  <div id="pages">
+
+    <!-- UPLOAD OVERLAY -->
+    <div id="upload-overlay">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:16px;">
+        <div class="spinner" style="width:36px;height:36px;border-width:3px;"></div>
+        <div style="font-size:15px;font-weight:600;color:var(--txt2);">Loading UCL Data…</div>
+      </div>
+    </div>
+
+    <!-- HOME -->
+    <div class="page active" id="page-home">
+      <div id="featured-card">
+        <div class="feat-header">
+          <span class="feat-tag">FEATURED PREDICTION</span>
+          <span class="feat-conf">CONFIDENCE: HIGH ★★★★★</span>
+        </div>
+        <div class="feat-body">
+          <div class="feat-team home">
+            <div class="feat-team-name" id="feat-home-name">—</div>
+          </div>
+          <div class="feat-center">
+            <svg class="donut-svg" width="120" height="120" id="feat-donut">
+              <circle cx="60" cy="60" r="46" fill="none" stroke="#333" stroke-width="18"/>
+              <circle id="feat-arc-home" cx="60" cy="60" r="46" fill="none" stroke="#00C853" stroke-width="18" stroke-dasharray="0 289" stroke-dashoffset="72" stroke-linecap="round" style="transition:stroke-dasharray .6s ease"/>
+              <circle id="feat-arc-away" cx="60" cy="60" r="46" fill="none" stroke="#4FC3F7" stroke-width="18" stroke-dasharray="0 289" stroke-dashoffset="72" stroke-linecap="round" style="transition:stroke-dasharray .6s ease"/>
+              <text id="feat-center-txt" x="60" y="65" text-anchor="middle" fill="#00C853" font-size="16" font-weight="700" font-family="DM Sans">—</text>
+            </svg>
+            <div class="feat-pcts">
+              <span class="feat-pct home-c" id="feat-p-home">Win —%</span>
+              <span class="feat-pct draw-c" id="feat-p-draw">Draw —%</span>
+              <span class="feat-pct away-c" id="feat-p-away">Win —%</span>
+            </div>
+          </div>
+          <div class="feat-team away">
+            <div class="feat-team-name" id="feat-away-name">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="perf-banner">
+        <span class="perf-num">96.2%</span>
+        <div class="perf-desc">
+          <strong>Model Accuracy</strong>
+          <span>Validated on Champions League Data</span>
+        </div>
+        <div class="perf-stats">
+          <div class="perf-stat"><span class="perf-stat-val">0.955</span><span class="perf-stat-lbl">r (Gls↔xG)</span></div>
+          <div class="perf-stat"><span class="perf-stat-val">0.911</span><span class="perf-stat-lbl">R²</span></div>
+          <div class="perf-stat"><span class="perf-stat-val" id="perf-players">696</span><span class="perf-stat-lbl">Players</span></div>
+        </div>
+      </div>
+
+      <div class="sec-title">Tournament Overview</div>
+      <div class="kpi-grid" id="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+          <div class="kpi-label">Players</div><div class="kpi-value" id="kpi-players">—</div><div class="kpi-sub">registered</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+          <div class="kpi-label">Total Goals</div><div class="kpi-value" id="kpi-goals">—</div><div class="kpi-sub">all clubs</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
+          <div class="kpi-label">Total Assists</div><div class="kpi-value" id="kpi-assists">—</div><div class="kpi-sub">across dataset</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+          <div class="kpi-label">Top Scorer</div><div class="kpi-value" id="kpi-scorer" style="font-size:15px;margin-top:2px">—</div><div class="kpi-sub" id="kpi-scorer-goals">— goals</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg></div>
+          <div class="kpi-label">Avg xG</div><div class="kpi-value" id="kpi-xg">—</div><div class="kpi-sub">per player</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></div>
+          <div class="kpi-label">Clubs</div><div class="kpi-value" id="kpi-clubs">—</div><div class="kpi-sub">competing</div>
+        </div>
+      </div>
+
+      <div class="sec-title">Top 10 Performers — Goals & Assists</div>
+      <div class="card" id="home-chart-wrap">
+        <div class="chart-loading" id="home-chart-load"><div class="spinner"></div>Loading chart…</div>
+        <div class="chart-canvas-wrap" id="home-chart-canvas-wrap" style="display:none; padding: 8px 0;">
+          <canvas id="home-chart-canvas" height="300"></canvas>
+        </div>
+        <img class="chart-img" id="home-chart" style="display:none"/>
+      </div>
+</div>
+      
+
+    <!-- PREDICTOR -->
+    <div class="page" id="page-predictor">
+      <div style="font-size:17px;font-weight:700;">Team Comparison &amp; Win Predictor</div>
+      <div style="font-size:13px;color:var(--txt2)">Select two clubs to compare their statistics and predict match outcome probability.</div>
+
+      <div id="pred-selector">
+        <div class="pred-team-col">
+          <span class="pred-team-label" style="color:var(--green)">Home Team</span>
+          <select id="pred-home" style="width:100%;"></select>
+        </div>
+        <div class="pred-vs">VS</div>
+        <div class="pred-team-col">
+          <span class="pred-team-label" style="color:var(--blue)">Away Team</span>
+          <select id="pred-away" style="width:100%;"></select>
+        </div>
+        <button class="btn" id="pred-btn" style="white-space:nowrap;padding:10px 24px;align-self:flex-end;">⚡ PREDICT</button>
+      </div>
+
+      <div id="pred-result">
+        <div class="pred-result-header">
+          <span class="feat-tag">MATCH PREDICTION</span>
+          <span class="pred-winner" id="pred-winner-lbl"></span>
+        </div>
+        <div class="pred-main">
+          <div class="pred-side">
+            <div class="pred-side-name" id="pred-h-name"></div>
+            <div class="pred-side-pct home-c" id="pred-h-pct"></div>
+            <div class="pred-side-lbl">WIN PROBABILITY</div>
+          </div>
+          <div class="pred-donut-col">
+            <svg class="donut-svg" width="150" height="150" id="pred-donut">
+              <circle cx="75" cy="75" r="56" fill="none" stroke="#333" stroke-width="22"/>
+              <circle id="pred-arc-home" cx="75" cy="75" r="56" fill="none" stroke="#00C853" stroke-width="22" stroke-dasharray="0 352" stroke-dashoffset="88" stroke-linecap="round" style="transition:stroke-dasharray .7s ease"/>
+              <circle id="pred-arc-away" cx="75" cy="75" r="56" fill="none" stroke="#4FC3F7" stroke-width="22" stroke-dasharray="0 352" stroke-dashoffset="88" stroke-linecap="round" style="transition:stroke-dasharray .7s ease"/>
+              <text id="pred-center-txt" x="75" y="80" text-anchor="middle" fill="#00C853" font-size="20" font-weight="700" font-family="DM Sans"></text>
+            </svg>
+            <div class="pred-draw" id="pred-draw-lbl"></div>
+          </div>
+          <div class="pred-side">
+            <div class="pred-side-name" id="pred-a-name"></div>
+            <div class="pred-side-pct away-c" id="pred-a-pct"></div>
+            <div class="pred-side-lbl">WIN PROBABILITY</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec-title">Visual Comparison</div>
+      <div class="card" id="pred-chart-wrap">
+        <div style="color:var(--txt3);font-size:13px;padding:20px;text-align:center;">Run a prediction to see the comparison chart</div>
+        <img class="chart-img" id="pred-chart" style="display:none"/>
+      </div>
+
+      <div class="sec-title">Detailed Statistics</div>
+      <div class="tbl-wrap">
+        <table id="pred-table">
+          <thead><tr><th>Metric</th><th id="pred-th-home" style="color:var(--green)">Home</th><th id="pred-th-away" style="color:var(--blue)">Away</th></tr></thead>
+          <tbody id="pred-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div class="page" id="page-analytics">
+      <div style="font-size:17px;font-weight:700;">Analytics</div>
+      <div class="sub-tabs">
+        <button class="sub-tab active" data-panel="panel-desc">Descriptive</button>
+        <button class="sub-tab" data-panel="panel-prob">Probability</button>
+        <button class="sub-tab" data-panel="panel-corr">Correlation</button>
+      </div>
+
+      <!-- Descriptive Panel -->
+      <div class="sub-panel active" id="panel-desc">
+        <div class="sec-title">Descriptive Statistics — 5 Key Variables</div>
+        <div class="tbl-wrap">
+          <table id="desc-table">
+            <thead><tr><th>Variable</th><th>Count</th><th>Mean</th><th>Median</th><th>Std Dev</th><th>Variance</th><th>Min</th><th>Max</th><th>Skewness</th><th>Kurtosis</th></tr></thead>
+            <tbody id="desc-tbody"></tbody>
+          </table>
+        </div>
+        <div class="sec-title">95% Confidence Intervals for Mean</div>
+        <div class="tbl-wrap">
+          <table id="ci-table">
+            <thead><tr><th>Variable</th><th>n</th><th>Mean</th><th>SE</th><th>95% CI Lower</th><th>95% CI Upper</th></tr></thead>
+            <tbody id="ci-tbody"></tbody>
+          </table>
+        </div>
+        <div class="sec-title">Distribution Explorer</div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">Variable:</span>
+          <select id="hist-var">
+            <option value="Gls">Goals</option>
+            <option value="Ast">Assists</option>
+            <option value="xG">Expected Goals (xG)</option>
+            <option value="Age">Age</option>
+            <option value="Min">Minutes Played</option>
+          </select>
+        </div>
+        <div class="card"><img class="chart-img" id="hist-chart" style="min-height:200px;"/></div>
+        <div class="sec-title">Distribution by Position</div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">Variable:</span>
+          <select id="box-var">
+            <option value="Gls">Goals</option>
+            <option value="Ast">Assists</option>
+            <option value="xG">Expected Goals (xG)</option>
+            <option value="Age">Age</option>
+            <option value="Min">Minutes Played</option>
+          </select>
+        </div>
+        <div class="card"><img class="chart-img" id="box-chart" style="min-height:200px;"/></div>
+      </div>
+
+      <!-- Probability Panel -->
+      <div class="sub-panel" id="panel-prob">
+        <div class="sec-title">Shapiro-Wilk Normality Test</div>
+        <div class="tbl-wrap">
+          <table id="norm-table">
+            <thead><tr><th>Variable</th><th>W Statistic</th><th>p-value</th><th>Normal?</th></tr></thead>
+            <tbody id="norm-tbody"></tbody>
+          </table>
+        </div>
+        <div class="info-box">
+          <strong>Interpretation:</strong> H₀ = data is normally distributed.
+          If p &gt; 0.05 → fail to reject → likely normal.
+          If p ≤ 0.05 → reject H₀ → not normally distributed.
+        </div>
+        <div class="sec-title">Poisson Distribution Fit</div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">Variable:</span>
+          <select id="pois-var">
+            <option value="Gls">Goals</option>
+            <option value="Ast">Assists</option>
+          </select>
+          <span class="ctrl-label" style="margin-left:16px">P(X ≤ k), k =</span>
+          <input type="number" id="pois-k" value="5" min="0" max="50" style="width:70px"/>
+          <span class="result-text" id="pois-cdf-result"></span>
+        </div>
+        <div class="card"><img class="chart-img" id="pois-chart" style="min-height:200px;"/></div>
+        <div class="info-box" id="pois-info"></div>
+      </div>
+
+      <!-- Correlation Panel -->
+      <div class="sub-panel" id="panel-corr">
+        <div class="sec-title">Pearson Correlation Matrix</div>
+        <div class="two-col">
+          <div class="card"><img class="chart-img" id="heatmap-chart" style="min-height:200px;"/></div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="info-box">
+              <strong>Correlation Strength Guide:</strong><br/>
+              <span style="color:var(--green)">|r| &gt; 0.7</span> — Strong<br/>
+              <span style="color:var(--gold)">0.4–0.7</span> — Moderate<br/>
+              <span style="color:var(--txt2)">0–0.4</span> — Weak<br/><br/>
+              <strong>Key findings:</strong><br/>
+              Goals ↔ xG: r = 0.955 (very strong)<br/>
+              Goals ↔ Assists: r = 0.600 (moderate)<br/>
+              xG ↔ Minutes: positive, expected
+            </div>
+            <div class="tbl-wrap" id="corr-table-wrap" style="max-height:300px;overflow-y:auto;"></div>
+          </div>
+        </div>
+        <div class="sec-title">Goals per 90 min by Position</div>
+        <div class="card"><img class="chart-img" id="pos-chart" style="min-height:180px;"/></div>
+      </div>
+    </div>
+
+    <!-- REGRESSION -->
+    <div class="page" id="page-regression">
+      <div style="font-size:17px;font-weight:700;">Regression Analysis</div>
+
+      <div class="sec-title">Simple Linear Regression</div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">X — Predictor:</span>
+        <select id="reg-x">
+          <option value="xG">Expected Goals (xG)</option>
+          <option value="Gls">Goals</option>
+          <option value="Ast">Assists</option>
+          <option value="Age">Age</option>
+          <option value="Min">Minutes Played</option>
+        </select>
+        <span class="ctrl-label">Y — Response:</span>
+        <select id="reg-y">
+          <option value="Gls">Goals</option>
+          <option value="Ast">Assists</option>
+          <option value="xG">Expected Goals (xG)</option>
+          <option value="Age">Age</option>
+          <option value="Min">Minutes Played</option>
+        </select>
+        <button class="btn" id="reg-run-btn">▶ Run</button>
+      </div>
+      <div class="info-box" id="reg-eq-box" style="display:none"></div>
+
+      <div class="ctrl-row" style="margin-top:4px">
+        <span class="ctrl-label">Predict Y for X =</span>
+        <input type="number" id="reg-pred-x" placeholder="e.g. 5.0" style="width:110px"/>
+        <button class="btn btn-outline" id="reg-pred-btn">Calculate</button>
+        <span class="result-text" id="reg-pred-result"></span>
+      </div>
+      <div class="card"><img class="chart-img" id="reg-scatter" style="min-height:200px;"/></div>
+
+      <div class="sec-title">Multiple Linear Regression: Goals ~ xG + Minutes + Age</div>
+      <div class="info-box blue" id="mult-eq-box">Loading…</div>
+      <div class="card"><img class="chart-img" id="reg-resid" style="min-height:180px;"/></div>
+    </div>
+
+    <!-- PLAYERS -->
+    <div class="page" id="page-players">
+      <div style="font-size:17px;font-weight:700;">Player Explorer</div>
+      <div class="players-filters">
+        <input type="text" id="pl-search" placeholder="🔍 Search player…" style="width:200px"/>
+        <span class="ctrl-label">Club:</span>
+        <select id="pl-squad"><option value="">All Clubs</option></select>
+        <span class="ctrl-label">Position:</span>
+        <select id="pl-pos"><option value="">All Positions</option></select>
+        <span class="ctrl-label">Sort by:</span>
+        <select id="pl-sort">
+          <option value="Gls">Goals</option>
+          <option value="Ast">Assists</option>
+          <option value="xG">xG</option>
+          <option value="Age">Age</option>
+          <option value="Min">Minutes</option>
+        </select>
+        <span id="players-count"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table id="players-table">
+          <thead><tr><th>#</th><th>Player</th><th>Club</th><th>Pos</th><th>Nation</th><th>Age</th><th>Min</th><th>Goals</th><th>Assists</th><th>xG</th></tr></thead>
+          <tbody id="players-tbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <button class="page-btn" id="pl-prev">← Prev</button>
+        <span id="pl-page-info">Page 1</span>
+        <button class="page-btn" id="pl-next">Next →</button>
+      </div>
+    </div>
+
+  </div><!-- /pages -->
+
+  <!-- BOTTOM NAV -->
+  <div id="nav">
+    <button class="nav-btn active" data-page="home">
+      <span class="nav-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      </span>HOME
+    </button>
+    <button class="nav-btn" data-page="predictor">
+      <span class="nav-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>
+      </span>PREDICTOR
+    </button>
+    <button class="nav-btn" data-page="analytics">
+      <span class="nav-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>
+      </span>ANALYTICS
+    </button>
+    <button class="nav-btn" data-page="regression">
+      <span class="nav-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </span>REGRESSION
+    </button>
+    <button class="nav-btn" data-page="players">
+      <span class="nav-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </span>PLAYERS
+    </button>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let dataLoaded = false;
+let squads = [];
+let playersPage = 1;
+let currentRegX = "xG", currentRegY = "Gls";
+
+// ── LOGO CANVAS ───────────────────────────────────────────────────────────────
+(function drawLogo() {
+  const c = document.getElementById("logo-canvas");
+  const ctx = c.getContext("2d");
+  const s = 34, cx = 17, cy = 17;
+  const grad = ctx.createLinearGradient(0,0,s,s);
+  grad.addColorStop(0, "#00C853"); grad.addColorStop(1, "#00E676");
+  ctx.beginPath(); ctx.arc(cx,cy,15,0,Math.PI*2);
+  ctx.fillStyle = grad; ctx.fill();
+  ctx.fillStyle = "#181818";
+  const r = 7.5, dr = 2.8;
+  for(let i=0;i<5;i++){
+    const a = -Math.PI/2 + i*2*Math.PI/5;
+    ctx.beginPath();
+    ctx.arc(cx+r*Math.cos(a), cy+r*Math.sin(a), dr, 0, Math.PI*2);
+    ctx.fill();
+  }
+})();
+
+// ── NAV ───────────────────────────────────────────────────────────────────────
+document.querySelectorAll(".nav-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("page-" + btn.dataset.page).classList.add("active");
+    if (!dataLoaded) return;
+    const pg = btn.dataset.page;
+    if (pg === "analytics") loadAnalyticsActive();
+    if (pg === "regression") loadRegression();
+    if (pg === "players") loadPlayers();
+  });
+});
+
+// ── SUB TABS ──────────────────────────────────────────────────────────────────
+document.querySelectorAll(".sub-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".sub-tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".sub-panel").forEach(p => p.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById(tab.dataset.panel).classList.add("active");
+    loadAnalyticsActive();
+  });
+});
+
+// ── AUTO-LOAD ON STARTUP ─────────────────────────────────────────────────────
+async function autoLoad() {
+  try {
+    const r = await fetch("/api/status");
+    const d = await r.json();
+    if (d.loaded) {
+      dataLoaded = true;
+      squads = d.squads || [];
+      const status = document.getElementById("upload-status");
+      status.textContent = `✔ ${d.players} players · ${d.clubs} clubs`;
+      status.className = "ok";
+      document.getElementById("upload-overlay").classList.add("hidden");
+      populateSquadDropdowns();
+      loadHome();
+    }
+  } catch(e) { console.error("Auto-load failed", e); }
+}
+autoLoad();
+
+// ── FILE UPLOAD (still available via header button) ───────────────────────────
+document.getElementById("file-input").addEventListener("change", function() {
+  if (!this.files[0]) return;
+  uploadFile(this.files[0]);
+});
+
+async function uploadFile(file) {
+  const status = document.getElementById("upload-status");
+  status.textContent = "Uploading…"; status.className = "";
+  const fd = new FormData(); fd.append("file", file);
+  try {
+    const r = await fetch("/api/upload", {method:"POST", body:fd});
+    const d = await r.json();
+    if (d.error) { status.textContent = "Error: " + d.error; status.className = "err"; return; }
+    dataLoaded = true;
+    squads = d.squads || [];
+    status.textContent = `✔ ${d.players} players · ${d.clubs} clubs`; status.className = "ok";
+    document.getElementById("upload-overlay").classList.add("hidden");
+    populateSquadDropdowns();
+    loadHome();
+  } catch(e) { status.textContent = "Upload failed"; status.className = "err"; }
+}
+
+function populateSquadDropdowns() {
+  [document.getElementById("pred-home"), document.getElementById("pred-away"),
+   document.getElementById("pl-squad")].forEach((sel, i) => {
+    if (i < 2) { sel.innerHTML = ""; squads.forEach(s => sel.add(new Option(s, s))); }
+    else { sel.innerHTML = '<option value="">All Clubs</option>'; squads.forEach(s => sel.add(new Option(s, s))); }
+  });
+  if (squads.length > 1) document.getElementById("pred-away").selectedIndex = 1;
+}
+
+// ── HOME ──────────────────────────────────────────────────────────────────────
+async function loadHome() {
+  const d = await api("/api/home");
+  const k = d.kpis;
+  document.getElementById("kpi-players").textContent = k.players;
+  document.getElementById("kpi-goals").textContent = k.total_goals;
+  document.getElementById("kpi-assists").textContent = k.total_assists;
+  document.getElementById("kpi-xg").textContent = k.avg_xg;
+  document.getElementById("kpi-clubs").textContent = k.clubs;
+  document.getElementById("kpi-scorer").textContent = k.top_scorer;
+  document.getElementById("kpi-scorer-goals").textContent = k.top_scorer_goals + " goals";
+  document.getElementById("perf-players").textContent = k.players;
+
+  // Featured prediction using first 2 squads
+  if (squads.length >= 2) runFeaturedPrediction(squads[0], squads[1]);
+
+  
+
+  // Chart
+  showChartLoad("home-chart-load", "home-chart");
+  const cd = await api("/api/chart/top_players");
+  hideChartLoad("home-chart-load", "home-chart", cd.img);
+}
+
+async function runFeaturedPrediction(home, away) {
+  const d = await api("/api/predict", "POST", {home, away});
+  if (d.error) return;
+  document.getElementById("feat-home-name").textContent = home;
+  document.getElementById("feat-away-name").textContent = away;
+  document.getElementById("feat-p-home").textContent = `Win ${d.home_p}%`;
+  document.getElementById("feat-p-draw").textContent = `Draw ${d.draw_p}%`;
+  document.getElementById("feat-p-away").textContent = `Win ${d.away_p}%`;
+  document.getElementById("feat-center-txt").textContent = d.home_p + "%";
+  updateDonut("feat-arc-home","feat-arc-away", 289, 72, d.home_p, d.draw_p, d.away_p);
+}
+
+function updateDonut(homeId, awayId, circ, offset, hp, dp, ap) {
+  const h = document.getElementById(homeId);
+  const a = document.getElementById(awayId);
+  const hDash = (hp/100)*circ;
+  const aDash = (ap/100)*circ;
+  h.setAttribute("stroke-dasharray", `${hDash} ${circ - hDash}`);
+  a.setAttribute("stroke-dasharray", `${aDash} ${circ - aDash}`);
+  // offset away arc to start from the other side
+  a.setAttribute("stroke-dashoffset", offset + (hp/100)*circ);
+}
+
+// ── PREDICTOR ─────────────────────────────────────────────────────────────────
+document.getElementById("pred-btn").addEventListener("click", runPredict);
+
+async function runPredict() {
+  const home = document.getElementById("pred-home").value;
+  const away = document.getElementById("pred-away").value;
+  if (!home || !away || home === away) { alert("Please select two different teams."); return; }
+  const d = await api("/api/predict","POST",{home,away});
+  if (d.error) { alert(d.error); return; }
+
+  const res = document.getElementById("pred-result");
+  res.classList.add("visible");
+
+  document.getElementById("pred-h-name").textContent = home;
+  document.getElementById("pred-a-name").textContent = away;
+  document.getElementById("pred-h-pct").textContent = d.home_p + "%";
+  document.getElementById("pred-a-pct").textContent = d.away_p + "%";
+  document.getElementById("pred-draw-lbl").textContent = `Draw  ${d.draw_p}%`;
+  document.getElementById("pred-center-txt").textContent = d.home_p + "%";
+  updateDonut("pred-arc-home","pred-arc-away", 352, 88, d.home_p, d.draw_p, d.away_p);
+
+  const wl = document.getElementById("pred-winner-lbl");
+  wl.className = "pred-winner " + (d.wside==="home"?"home-w":d.wside==="away"?"away-w":"draw-w");
+  wl.textContent = d.wside === "draw" ? "⚖️ Too Close to Call"
+    : `🏆 ${d.winner.toUpperCase()} FAVOURED TO WIN`;
+
+  document.getElementById("pred-th-home").textContent = home;
+  document.getElementById("pred-th-away").textContent = away;
+  const metrics = [
+    ["Total Goals", d.home_stats.goals, d.away_stats.goals],
+    ["Total Assists", d.home_stats.assists, d.away_stats.assists],
+    ["Avg xG / Player", d.home_stats.avg_xg, d.away_stats.avg_xg],
+    ["Goals / Player", d.home_stats.gpp, d.away_stats.gpp],
+    ["xG Accuracy", d.home_stats.xg_acc, d.away_stats.xg_acc],
+    ["Avg Age", d.home_stats.avg_age, d.away_stats.avg_age],
+    ["Squad Size", d.home_stats.players, d.away_stats.players],
+  ];
+  document.getElementById("pred-tbody").innerHTML = metrics.map(([m,h,a]) => `
+    <tr><td style="font-weight:600">${m}</td>
+    <td class="td-green">${h}</td>
+    <td class="td-blue">${a}</td></tr>`).join("");
+
+  // chart via regression API reused for comparison — load scatter for now
+  document.getElementById("pred-chart").style.display="none";
+  document.getElementById("pred-chart-wrap").querySelector("div").textContent = "Loading comparison chart…";
+  // For comparison we use the top_players chart context, generate a simple bar client-side via canvas
+  renderCompareChart(home, away, d);
+}
+
+function renderCompareChart(home, away, d) {
+  // Draw a simple comparison using an offscreen canvas
+  const wrap = document.getElementById("pred-chart-wrap");
+  const old = document.getElementById("pred-chart");
+  const canvas = document.createElement("canvas");
+  canvas.width = 800; canvas.height = 300;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#222"; ctx.fillRect(0,0,800,300);
+
+  const labels = ["Total Goals","Total Assists","Avg xG×10","Goals/Pl×10"];
+  const hv = [d.home_stats.goals, d.home_stats.assists, d.home_stats.avg_xg*10, d.home_stats.gpp*10];
+  const av = [d.away_stats.goals, d.away_stats.assists, d.away_stats.avg_xg*10, d.away_stats.gpp*10];
+  const maxV = Math.max(...hv,...av) * 1.2 || 1;
+  const barW = 60, gap = 100, startX = 80, chartH = 200, topY = 40;
+
+  labels.forEach((lbl, i) => {
+    const x = startX + i * gap;
+    // home bar
+    const hh = (hv[i]/maxV)*chartH;
+    ctx.fillStyle = "#00C853";
+    ctx.fillRect(x, topY + chartH - hh, barW*0.45, hh);
+    // away bar
+    const ah = (av[i]/maxV)*chartH;
+    ctx.fillStyle = "#4FC3F7";
+    ctx.fillRect(x + barW*0.5, topY + chartH - ah, barW*0.45, ah);
+    // label
+    ctx.fillStyle = "#888"; ctx.font = "11px DM Sans";
+    ctx.textAlign = "center";
+    ctx.fillText(lbl, x + barW*0.45, topY + chartH + 18);
+    // values
+    ctx.fillStyle = "#00C853"; ctx.font = "bold 11px DM Sans";
+    ctx.fillText(Math.round(hv[i]*10)/10, x + barW*0.2, topY + chartH - hh - 5);
+    ctx.fillStyle = "#4FC3F7";
+    ctx.fillText(Math.round(av[i]*10)/10, x + barW*0.72, topY + chartH - ah - 5);
+  });
+
+  // Legend
+  ctx.fillStyle = "#00C853"; ctx.fillRect(startX, 10, 14, 14);
+  ctx.fillStyle = "#eee"; ctx.font = "12px DM Sans"; ctx.textAlign="left";
+  ctx.fillText(home, startX+18, 22);
+  ctx.fillStyle = "#4FC3F7"; ctx.fillRect(startX+120, 10, 14, 14);
+  ctx.fillStyle = "#eee";
+  ctx.fillText(away, startX+138, 22);
+
+  const img = canvas.toDataURL();
+  old.src = img; old.style.display="block";
+  wrap.querySelector("div").textContent = "";
+}
+
+// ── ANALYTICS ─────────────────────────────────────────────────────────────────
+let analyticsLoaded = { desc:false, prob:false, corr:false };
+
+function loadAnalyticsActive() {
+  const active = document.querySelector(".sub-tab.active")?.dataset.panel;
+  if (active === "panel-desc" && !analyticsLoaded.desc) loadDesc();
+  if (active === "panel-prob" && !analyticsLoaded.prob) loadProb();
+  if (active === "panel-corr" && !analyticsLoaded.corr) loadCorr();
+}
+
+async function loadDesc() {
+  analyticsLoaded.desc = true;
+  const [desc, ci] = await Promise.all([api("/api/analytics/descriptive"), api("/api/analytics/ci")]);
+  fillTable("desc-tbody", desc, ["Variable","Count","Mean","Median","Std Dev","Variance","Min","Max","Skewness","Kurtosis"]);
+  fillTable("ci-tbody", ci, ["Variable","n","Mean","SE","95% CI Lower","95% CI Upper"]);
+  loadHistChart(); loadBoxChart();
+}
+
+async function loadProb() {
+  analyticsLoaded.prob = true;
+  const norm = await api("/api/analytics/normality");
+  const tbody = document.getElementById("norm-tbody");
+  tbody.innerHTML = norm.map(r => `
+    <tr><td>${r.Variable}</td><td>${r["W Statistic"]}</td>
+    <td>${r["p-value"]}</td>
+    <td class="${r["Normal?"].includes("Yes")?"td-green":"td-red"}">${r["Normal?"]}</td></tr>`).join("");
+  loadPoissonChart();
+}
+
+async function loadCorr() {
+  analyticsLoaded.corr = true;
+  const d = await api("/api/chart/heatmap");
+  document.getElementById("heatmap-chart").src = d.img;
+  // Correlation table
+  const vars = ["Gls","Ast","xG","Age","Min"];
+  const lbls = ["Goals","Assists","xG","Age","Minutes"];
+  if (d.corr) {
+    let html = `<table><thead><tr><th></th>${lbls.map(l=>`<th>${l}</th>`).join("")}</tr></thead><tbody>`;
+    vars.forEach((v,i) => {
+      html += `<tr><td style="font-weight:600;color:var(--txt2)">${lbls[i]}</td>`;
+      vars.forEach(v2 => {
+        const val = d.corr[v]?.[v2] ?? "—";
+        const abs = Math.abs(val);
+        const col = abs > 0.7 ? "var(--green)" : abs > 0.4 ? "var(--gold)" : "var(--txt2)";
+        html += `<td style="color:${col};font-weight:${abs>0.7?"600":"400"}">${val}</td>`;
+      });
+      html += `</tr>`;
+    });
+    html += `</tbody></table>`;
+    document.getElementById("corr-table-wrap").innerHTML = html;
+  }
+  const pd = await api("/api/chart/goals_by_position");
+  document.getElementById("pos-chart").src = pd.img;
+}
+
+async function loadHistChart() {
+  const v = document.getElementById("hist-var").value;
+  const d = await api(`/api/chart/histogram/${v}`);
+  document.getElementById("hist-chart").src = d.img;
+}
+async function loadBoxChart() {
+  const v = document.getElementById("box-var").value;
+  const d = await api(`/api/chart/boxplot/${v}`);
+  document.getElementById("box-chart").src = d.img;
+}
+async function loadPoissonChart() {
+  const v = document.getElementById("pois-var").value;
+  const k = document.getElementById("pois-k").value;
+  const d = await api(`/api/chart/poisson/${v}`);
+  document.getElementById("pois-chart").src = d.img;
+  document.getElementById("pois-info").innerHTML =
+    `<strong>λ (lambda) = ${d.lambda}</strong> — the Poisson rate parameter equals the mean of ${v === "Gls" ? "Goals" : "Assists"}.`;
+  loadPoissonCDF();
+}
+async function loadPoissonCDF() {
+  const v = document.getElementById("pois-var").value;
+  const k = document.getElementById("pois-k").value;
+  const d = await api(`/api/analytics/poisson_cdf?var=${v}&k=${k}`);
+  document.getElementById("pois-cdf-result").textContent = `  P(X ≤ ${k}) = ${d.p}`;
+}
+
+document.getElementById("hist-var").addEventListener("change", loadHistChart);
+document.getElementById("box-var").addEventListener("change", loadBoxChart);
+document.getElementById("pois-var").addEventListener("change", () => { loadPoissonChart(); });
+document.getElementById("pois-k").addEventListener("input", loadPoissonCDF);
+
+// ── REGRESSION ────────────────────────────────────────────────────────────────
+document.getElementById("reg-run-btn").addEventListener("click", loadSimpleReg);
+document.getElementById("reg-pred-btn").addEventListener("click", async () => {
+  const x = document.getElementById("reg-pred-x").value;
+  if (!x) return;
+  const d = await api(`/api/regression/predict?x=${currentRegX}&y=${currentRegY}&val=${x}`);
+  document.getElementById("reg-pred-result").textContent =
+    `  →  ${d.y_label} ≈ ${d.y_hat}`;
+});
+
+async function loadRegression() {
+  loadSimpleReg();
+  const d = await api("/api/regression/multiple");
+  document.getElementById("mult-eq-box").innerHTML =
+    `Goals = <strong>${d.intercept}</strong> + <strong>${d.coef_xG}</strong> · xG `+
+    `+ <strong>${d.coef_Min}</strong> · Minutes + <strong>${d.coef_Age}</strong> · Age`+
+    `&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;R² = <strong style="color:var(--green)">${d.R2}</strong>`+
+    `&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;n = ${d.n}`;
+  document.getElementById("reg-resid").src = d.img;
+}
+
+async function loadSimpleReg() {
+  currentRegX = document.getElementById("reg-x").value;
+  currentRegY = document.getElementById("reg-y").value;
+  const d = await api(`/api/regression/simple?x=${currentRegX}&y=${currentRegY}`);
+  if (d.error) { alert(d.error); return; }
+  const box = document.getElementById("reg-eq-box");
+  box.style.display = "block";
+  box.innerHTML =
+    `<strong>Equation:</strong> ${d.y_label} = ${d.slope} × ${d.x_label} + ${d.intercept}`+
+    `&nbsp;&nbsp;|&nbsp;&nbsp;R² = <span style="color:var(--green);font-weight:700">${d.R2}</span>`+
+    `&nbsp;&nbsp;|&nbsp;&nbsp;r = ${d.r}`+
+    `&nbsp;&nbsp;|&nbsp;&nbsp;p-value = ${d.p_value}`+
+    `&nbsp;&nbsp;|&nbsp;&nbsp;SE = ${d.SE}`;
+  document.getElementById("reg-scatter").src = d.img;
+}
+
+// ── PLAYERS ───────────────────────────────────────────────────────────────────
+async function loadPlayers() {
+  const name  = document.getElementById("pl-search").value;
+  const squad = document.getElementById("pl-squad").value;
+  const pos   = document.getElementById("pl-pos").value;
+  const sort  = document.getElementById("pl-sort").value;
+  const d = await api(`/api/players?name=${encodeURIComponent(name)}&squad=${encodeURIComponent(squad)}&pos=${encodeURIComponent(pos)}&sort=${sort}&page=${playersPage}`);
+  document.getElementById("players-count").textContent = `${d.total} players`;
+  const offset = (playersPage-1)*d.per;
+  document.getElementById("players-tbody").innerHTML = d.rows.map((r,i) => `
+    <tr>
+      <td class="td-muted">${offset+i+1}</td>
+      <td style="font-weight:600">${r.Player}</td>
+      <td class="td-muted">${r.Squad}</td>
+      <td>${r.Pos}</td>
+      <td class="td-muted">${r.Nation||"—"}</td>
+      <td>${r.Age}</td>
+      <td class="td-muted">${r.Min}</td>
+      <td class="td-green">${r.Gls}</td>
+      <td class="td-blue">${r.Ast}</td>
+      <td>${r.xG}</td>
+    </tr>`).join("");
+
+  // positions dropdown
+  const posEl = document.getElementById("pl-pos");
+  if (d.positions && posEl.options.length === 1) {
+    d.positions.forEach(p => posEl.add(new Option(p,p)));
+  }
+  const totalPages = Math.ceil(d.total/d.per);
+  document.getElementById("pl-page-info").textContent = `Page ${playersPage} of ${totalPages}`;
+  document.getElementById("pl-prev").disabled = playersPage <= 1;
+  document.getElementById("pl-next").disabled = playersPage >= totalPages;
+}
+
+document.getElementById("pl-prev").addEventListener("click", () => { playersPage--; loadPlayers(); });
+document.getElementById("pl-next").addEventListener("click", () => { playersPage++; loadPlayers(); });
+["pl-search","pl-squad","pl-pos","pl-sort"].forEach(id => {
+  document.getElementById(id).addEventListener("change", () => { playersPage=1; loadPlayers(); });
+});
+document.getElementById("pl-search").addEventListener("input", () => { playersPage=1; loadPlayers(); });
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+async function api(url, method="GET", body=null) {
+  const opts = { method, headers: {"Content-Type":"application/json"} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+function fillTable(tbodyId, data, cols) {
+  document.getElementById(tbodyId).innerHTML = data.map(row =>
+    `<tr>${cols.map(c => `<td>${row[c] ?? "—"}</td>`).join("")}</tr>`
+  ).join("");
+}
+
+function showChartLoad(loadId, imgId) {
+  document.getElementById(loadId).style.display = "flex";
+  document.getElementById(imgId).style.display = "none";
+}
+function hideChartLoad(loadId, imgId, src) {
+  document.getElementById(loadId).style.display = "none";
+  const img = document.getElementById(imgId);
+  img.src = src; img.style.display = "block";
+}
+</script>
+</body>
+</html>
