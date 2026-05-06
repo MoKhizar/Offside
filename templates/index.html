@@ -252,7 +252,7 @@ select option { background: var(--bg3); }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
 /* ── UNIVERSAL RESPONSIVENESS OVERRIDE ─────────────────── */
-@media (max-width: 100%) {
+@media (max-width: 800px) {
   /* Fix Grid: Stacks items on mobile, stays grid on tablet */
   .kpi-grid { 
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important; 
@@ -369,7 +369,6 @@ select option { background: var(--bg3); }
           <div class="perf-stat"><span class="perf-stat-val">0.911</span><span class="perf-stat-lbl">R²</span></div>
           <div class="perf-stat"><span class="perf-stat-val" id="perf-players">696</span><span class="perf-stat-lbl">Players</span></div>
         </div>
-        
       </div>
 
       <div class="sec-title">Tournament Overview</div>
